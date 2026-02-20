@@ -1,139 +1,351 @@
-What is Domestic Care Services (DCS)?
-
-How do I get started with DCS?
-
-What services are available on DCS?
-
-Is DCS available in my area?
-
-How do I contact customer support?
-
-How do I book a service?
-
-Can I request a custom service?
-
-How does the payment system work?
-
-What is the wallet and how do I top up?
-
-How do I track my service provider?
-
-Can I chat with my service provider?
-
-What happens if I'm not satisfied with the service?
-
-How do I cancel a booking?
-
-Can I reschedule a service?
-
-What if my provider doesn't show up?
-
-How do I become a service provider?
-
-What documents do I need for verification?
-
-How long does verification take?
-
-Can I set my own rates?
-
-How do I manage my availability?
-
-How do I accept or reject service requests?
-
-What happens after I accept a request?
-
-How do I update my location during service?
-
-How do I mark a service as completed?
-
-How do I get paid?
-
-Can I view my earnings history?
-
-What if a client disputes a payment?
-
-Why do I need email verification?
-
-Is my personal information safe?
-
-What happens if I forget my password?
-
-How do I update my profile information?
-
-Can I have multiple accounts?
-
-The app keeps crashing. What should I do?
-
-I'm not receiving notifications. How do I fix this?
-
-The chat isn't loading. What's wrong?
-
-Why is my location not updating?
-
-I can't upload my verification documents. What should I do?
-
-What if the service takes longer than expected?
-
-Can I request a specific provider?
-
-What's the cancellation policy?
-
-Can I book recurring services?
-
-What if I need to add more tasks during service?
-
-What payment methods are accepted for wallet top-up?
-
-Is there a minimum wallet balance?
-
-Can I get a refund?
-
-How long do withdrawals take?
-
-Are there any transaction fees?
-
-How do I rate a service?
-
-Can I change my rating after submitting?
-
-Are reviews visible to other users?
-
-Can providers see my review?
-
-What if a review is inappropriate?
-
-How do I delete my account?
-
-Can I change my role from client to provider?
-
-How do I update my profile picture?
-
-What information is required on my profile?
-
-Can I have a private profile?
-
-What is elderly care on DCS?
-
-What does housekeeping include?
-
-What pet care services are available?
-
-Can I request specialized services?
-
-Are background checks required for providers?
-
-Why am I getting too many notifications?
-
-Can I turn off notifications?
-
-What notifications will I receive?
-
-I can't log in. What should I do?
-
-The app is running slowly. How do I fix this?
-
-Why can't I see available providers?
-
-My booking disappeared. What happened?
-
-I'm having trouble with the chat feature.
+NEXAGENT - CUSTOMER SUPPORT FAQ
+================================
+
+ACCOUNT & GETTING STARTED
+=========================
+1. How do I sign up for NexAgent?
+2. Is there a free trial?
+3. How do I reset my password?
+4. Can I change my email address?
+5. How do I delete my account?
+6. Can I have multiple accounts?
+7. How do I enable two-factor authentication?
+8. What happens to my workflows if I delete my account?
+
+PRICING & BILLING
+=================
+9. What are the pricing plans?
+10. How much does the Pro plan cost?
+11. What's included in the Free plan?
+12. What's included in the Pro plan?
+13. What's included in the Enterprise plan?
+14. Can I upgrade or downgrade anytime?
+15. Do you offer annual billing discounts?
+16. What payment methods do you accept?
+17. When will I be charged?
+18. Can I get an invoice?
+19. What's your refund policy?
+20. Do you offer a money-back guarantee?
+21. How do I cancel my subscription?
+22. What happens if I cancel?
+23. Can I pause my subscription?
+24. Do you offer discounts for nonprofits?
+25. Do you offer discounts for students?
+
+FEATURES & CAPABILITIES
+=======================
+26. What can I do with NexAgent?
+27. How many workflows can I create?
+28. How many times can I run a workflow?
+29. What's the maximum number of nodes in a workflow?
+30. Can I share workflows with others?
+31. Can I make workflows public?
+32. Can I sell my workflows?
+33. How do I earn money from workflows?
+34. What's the marketplace?
+35. How do I use a marketplace template?
+36. Can I customize marketplace templates?
+37. How many integrations are available?
+38. Can I connect my own tools?
+39. Do you have an API?
+40. Can I use NexAgent with my CRM?
+41. Can I use NexAgent with my e-commerce platform?
+42. Can I use NexAgent with my email service?
+43. Can I use NexAgent with my payment processor?
+44. Can I use NexAgent with Google Sheets?
+45. Can I use NexAgent with Slack?
+
+WORKFLOWS & AUTOMATION
+======================
+46. How do I create a workflow?
+47. How do I edit a workflow?
+48. How do I delete a workflow?
+49. How do I duplicate a workflow?
+50. How do I test a workflow?
+51. How do I run a workflow manually?
+52. How do I schedule a workflow?
+53. How do I trigger a workflow with a webhook?
+54. How do I pass data to a workflow?
+55. How do I see workflow results?
+56. How do I view execution history?
+57. How do I debug a failing workflow?
+58. How do I optimize workflow performance?
+59. How do I reduce workflow costs?
+60. Can I pause a running workflow?
+61. Can I cancel a running workflow?
+62. How long can a workflow run?
+63. What happens if a workflow fails?
+64. Can I retry a failed workflow?
+65. How do I get notified of workflow failures?
+
+NODES & WORKFLOW BUILDING
+=========================
+66. What are nodes?
+67. How many node types are available?
+68. What's a trigger node?
+69. What's a communication node?
+70. What's a logic node?
+71. What's a data node?
+72. What's an integration node?
+73. What's an AI node?
+74. How do I add a node to my workflow?
+75. How do I configure a node?
+76. How do I connect nodes?
+77. How do I delete a node?
+78. Can I disable a node?
+79. How do I use variables in nodes?
+80. What's the syntax for variables?
+
+INTEGRATIONS & CONNECTIONS
+===========================
+81. How do I add an integration?
+82. How do I manage my API keys?
+83. How do I revoke an API key?
+84. How do I test an integration?
+85. What if an integration isn't working?
+86. How do I connect to Slack?
+87. How do I connect to Telegram?
+88. How do I connect to Gmail?
+89. How do I connect to Google Sheets?
+90. How do I connect to Stripe?
+91. How do I connect to Shopify?
+92. How do I connect to Salesforce?
+93. How do I connect to HubSpot?
+94. How do I connect to Zapier?
+95. How do I connect to custom APIs?
+
+SUPPORT & HELP
+==============
+96. How do I contact support?
+97. What are your support hours?
+98. How fast will you respond?
+99. Do you offer phone support?
+100. Do you offer live chat support?
+101. Is there a knowledge base?
+102. Are there video tutorials?
+103. Is there a community forum?
+104. Can I request a feature?
+105. How do I report a bug?
+106. Do you offer training?
+107. Do you offer consulting?
+108. Can you help me build a workflow?
+109. Can you help me optimize my workflow?
+110. What if I'm stuck?
+
+SECURITY & PRIVACY
+==================
+111. Is my data secure?
+112. Is NexAgent encrypted?
+113. Where is my data stored?
+114. Do you backup my data?
+115. Can I export my data?
+116. Can I delete my data?
+117. Do you comply with GDPR?
+118. Do you comply with CCPA?
+119. Do you comply with HIPAA?
+120. Is NexAgent SOC 2 certified?
+121. Do you have a privacy policy?
+122. Do you sell my data?
+123. Who can see my workflows?
+124. Who can see my credentials?
+125. How do I control access to my workflows?
+
+PERFORMANCE & LIMITS
+====================
+126. How many workflows can I run at once?
+127. What's the execution timeout?
+128. What's the maximum file size?
+129. What's the maximum data size?
+130. How long is execution history kept?
+131. What's the API rate limit?
+132. How do I increase my limits?
+133. What happens if I exceed my limits?
+134. How do I monitor my usage?
+135. How do I see my costs?
+
+TEAM & COLLABORATION
+====================
+136. Can I invite team members?
+137. How do I manage team permissions?
+138. Can team members edit my workflows?
+139. Can team members see my credentials?
+140. Can I remove a team member?
+141. Can I transfer ownership of a workflow?
+142. Can I share workflows with specific people?
+143. Can I make workflows public?
+144. How do I control who can use my workflows?
+145. Can I see team activity?
+
+ANALYTICS & REPORTING
+=====================
+146. How do I view analytics?
+147. How do I see execution statistics?
+148. How do I track costs?
+149. How do I see token usage?
+150. How do I generate reports?
+151. Can I export analytics?
+152. How do I set up alerts?
+153. Can I see real-time metrics?
+154. How do I track ROI?
+155. How do I benchmark performance?
+
+USE CASES & EXAMPLES
+====================
+156. Can I use NexAgent for e-commerce?
+157. Can I use NexAgent for lead generation?
+158. Can I use NexAgent for content creation?
+159. Can I use NexAgent for data management?
+160. Can I use NexAgent for customer support?
+161. Can I use NexAgent for marketing automation?
+162. Can I use NexAgent for HR automation?
+163. Can I use NexAgent for finance automation?
+164. Can I use NexAgent for social media?
+165. Can I use NexAgent for email marketing?
+
+MOBILE & ACCESSIBILITY
+======================
+166. Is there a mobile app?
+167. Can I use NexAgent on my phone?
+168. Can I use NexAgent on my tablet?
+169. Is NexAgent accessible for disabled users?
+170. Does NexAgent support dark mode?
+171. Does NexAgent support keyboard shortcuts?
+172. What browsers are supported?
+173. Is NexAgent mobile-friendly?
+174. Can I manage workflows on mobile?
+175. Can I view analytics on mobile?
+
+INTEGRATIONS - SPECIFIC
+=======================
+176. How do I integrate with Shopify?
+177. How do I integrate with WooCommerce?
+178. How do I integrate with Salesforce?
+179. How do I integrate with HubSpot?
+180. How do I integrate with Mailchimp?
+181. How do I integrate with Zapier?
+182. How do I integrate with IFTTT?
+183. How do I integrate with Airtable?
+184. How do I integrate with Notion?
+185. How do I integrate with Asana?
+
+ADVANCED FEATURES
+=================
+186. What's workflow versioning?
+187. Can I rollback to a previous version?
+188. Can I A/B test workflows?
+189. Can I use conditional logic?
+190. Can I use loops?
+191. Can I use delays?
+192. Can I use AI in workflows?
+193. Can I use multiple AI models?
+194. Can I use custom code?
+195. Can I create custom nodes?
+
+MIGRATION & IMPORT/EXPORT
+=========================
+196. Can I migrate from another platform?
+197. Can I import workflows?
+198. Can I export workflows?
+199. What file formats are supported?
+200. Can I backup my workflows?
+201. Can I restore from backup?
+202. Can I migrate to another platform?
+203. How do I transfer workflows to a team member?
+204. Can I clone a workflow?
+205. Can I merge workflows?
+
+TROUBLESHOOTING
+===============
+206. My workflow isn't running. What do I do?
+207. My workflow is running slowly. What do I do?
+208. My workflow is failing. What do I do?
+209. My integration isn't working. What do I do?
+210. I'm getting an error. What do I do?
+211. My credentials aren't working. What do I do?
+212. I can't connect to a service. What do I do?
+213. My data isn't being transferred. What do I do?
+214. My workflow is using too many tokens. What do I do?
+215. My costs are too high. What do I do?
+
+COMPLIANCE & REGULATIONS
+========================
+216. Is NexAgent compliant with GDPR?
+217. Is NexAgent compliant with CCPA?
+218. Is NexAgent compliant with HIPAA?
+219. Is NexAgent compliant with PCI DSS?
+220. Is NexAgent SOC 2 certified?
+221. Does NexAgent have a DPA?
+222. Does NexAgent have a BAA?
+223. Can I use NexAgent in my industry?
+224. What are your compliance certifications?
+225. How do I ensure compliance in my workflows?
+
+ROADMAP & FUTURE
+================
+226. What features are coming soon?
+227. When will feature X be released?
+228. Can I request a feature?
+229. How often are updates released?
+230. Will there be a mobile app?
+231. Will there be more integrations?
+232. Will there be offline mode?
+233. Will there be custom nodes?
+234. What's the long-term vision?
+235. How can I stay updated?
+
+ENTERPRISE & CUSTOM
+===================
+236. What's included in Enterprise?
+237. How do I get a custom plan?
+238. Can I get a dedicated account manager?
+239. Can I get custom integrations?
+240. Can I get on-premise deployment?
+241. Can I get custom training?
+242. Can I get custom SLA?
+243. Can I get priority support?
+244. Can I get custom features?
+245. How do I contact sales?
+
+BILLING ISSUES
+==============
+246. Why was I charged?
+247. Why is my charge different?
+248. Can I get a refund?
+249. Can I dispute a charge?
+250. How do I update my payment method?
+251. What if my payment fails?
+252. Can I get an invoice?
+253. Can I change my billing cycle?
+254. Can I get a discount?
+255. What's your refund policy?
+
+ACCOUNT ISSUES
+==============
+256. I forgot my password. What do I do?
+257. I can't log in. What do I do?
+258. My account is locked. What do I do?
+259. I'm getting a security warning. What do I do?
+260. Someone accessed my account. What do I do?
+261. I want to change my email. How do I do it?
+262. I want to change my password. How do I do it?
+263. I want to enable 2FA. How do I do it?
+264. I want to disable 2FA. How do I do it?
+265. I want to delete my account. How do I do it?
+
+GENERAL QUESTIONS
+=================
+266. What is NexAgent?
+267. Who is NexAgent for?
+268. How does NexAgent work?
+269. Why should I use NexAgent?
+270. How is NexAgent different from competitors?
+271. Is NexAgent reliable?
+272. What's your uptime guarantee?
+273. How many users does NexAgent have?
+274. How long has NexAgent been around?
+275. Who founded NexAgent?
+276. Where is NexAgent based?
+277. Is NexAgent hiring?
+278. Can I invest in NexAgent?
+279. What's your business model?
+280. How do I stay updated on NexAgent news?

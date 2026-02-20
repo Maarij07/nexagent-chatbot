@@ -66,7 +66,7 @@ def get_simple_embedding(text: str):
 @app.post("/ingest")
 def ingest_pdf():
     try:
-        pdf_path = "data/domestic_care_services.pdf"
+        pdf_path = "data/NexAgent_Documentation.pdf"
         if not os.path.exists(pdf_path):
             raise HTTPException(status_code=404, detail="PDF not found")
         
@@ -80,7 +80,7 @@ def ingest_pdf():
                 documents.append({
                     "text": text,
                     "page": page_num + 1,
-                    "source": "domestic_care_services.pdf"
+                    "source": "NexAgent_Documentation.pdf"
                 })
         
         logger.info(f"Extracted {len(documents)} pages from PDF")
