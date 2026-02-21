@@ -141,19 +141,58 @@ def query_chatbot(request: QueryRequest):
         if not context:
             context = "No relevant documents found in the knowledge base."
         
-        # Generate answer using Groq
-        message = groq_client.chat.completions.create(
+        # Step 1: Generate initial draft using Groq (Internal RAG Pass)
+        draft_message = groq_client.chat.completions.create(
             model="llama-3.3-70b-versatile",
             messages=[
                 {
+                    "role": "system",
+                    "content": "You are an expert technical assistant. Your job is to extract the EXACT step-by-step instructions and information from the provided context."
+                },
+                {
                     "role": "user",
-                    "content": f"Context: {context}\n\nQuestion: {request.question}\n\nProvide a helpful answer based on the context."
+                    "content": f"Context: {context}\n\nQuestion: {request.question}\n\nProvide an accurate and complete answer based on the context. You MUST provide the actual information and instructions (e.g., exactly how to create an account, exactly what steps to click). Do not just say 'Follow the instructions in Section X'."
                 }
             ],
             max_tokens=1024,
         )
         
-        answer = message.choices[0].message.content
+        draft_answer = draft_message.choices[0].message.content
+        
+        # Step 2: Customer Support Pass (Summarization & Refinement)
+        refinement_prompt = f"""You are a helpful, professional, and friendly customer support agent for NexAgent.
+Your task is to take the following raw technical response and rewrite it to be clean and conversational. 
+CRITICAL INSTRUCTIONS:
+- IF the user's question was just a simple greeting (like "hi", "hello", "hey"), IGNORE the raw response entirely and simply greet them back warmly and ask how you can help.
+- You MUST keep the final response short and easy to read. DO NOT exceed 15 lines of text under any circumstances.
+- You MUST provide the actual detailed instructions, steps, and information to the user.
+- DO NOT mention page numbers, section numbers, or document names (e.g., "Refer to section 2.1 (page 4)"). Just give the user the information directly.
+- Use Markdown formatting (e.g., **bolding** key terms, using bullet points) to improve readability.
+- Maintain a warm and polite tone.
+
+User's Original Question: {request.question}
+
+Raw Response to Rewrite:
+{draft_answer}
+
+Rewritten Customer Support Response:"""
+
+        final_message = groq_client.chat.completions.create(
+            model="llama-3.3-70b-versatile",
+            messages=[
+                {
+                    "role": "system",
+                    "content": "You are a customer support agent. Output only the final rewritten message without meta-commentary."
+                },
+                {
+                    "role": "user",
+                    "content": refinement_prompt
+                }
+            ],
+            max_tokens=1024,
+        )
+
+        final_answer = final_message.choices[0].message.content
         
         # Extract sources
         sources = list(set([
@@ -163,7 +202,7 @@ def query_chatbot(request: QueryRequest):
         
         return QueryResponse(
             question=request.question,
-            answer=answer,
+            answer=final_answer,
             sources=sources
         )
     
