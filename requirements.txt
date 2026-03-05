@@ -1,7 +1,26 @@
+# ── Web framework ─────────────────────────────────────────────────────────────
 fastapi==0.115.0
 uvicorn[standard]
 python-dotenv==1.0.0
 pydantic==2.12.5
+
+# ── LangChain / LangGraph stack ───────────────────────────────────────────────
+langchain>=0.3.14
+langchain-core>=0.3.29
+langchain-groq>=0.2.4
+langchain-community>=0.3.14
+langchain-pinecone>=0.2.0
+langchain-huggingface>=0.1.2
+langgraph>=0.2.60
+
+# ── Embeddings ────────────────────────────────────────────────────────────────
+sentence-transformers>=3.3.1
+
+# ── Vector DB ─────────────────────────────────────────────────────────────────
 pinecone==6.0.0
+
+# ── LLM provider (direct SDK kept for compatibility) ──────────────────────────
 groq==0.30.0
+
+# ── Document ingestion ────────────────────────────────────────────────────────
 pypdf==3.17.1

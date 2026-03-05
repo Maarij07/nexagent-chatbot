@@ -1,290 +1,171 @@
-# RAG Chatbot - Technical Explanation
+# NexAgent Agentic Chatbot — Technical Explanation
 
-## What is a RAG Chatbot?
+## What Changed (v1 → v2)
 
-RAG stands for **Retrieval-Augmented Generation**. Instead of the AI making up answers, it:
-1. Searches your documents for relevant information
-2. Uses that information to generate accurate answers
-
-Think of it like giving the AI a reference book before asking questions.
+| Aspect | v1 (RAG only) | v2 (Agentic) |
+|--------|---------------|--------------|
+| Architecture | Static 2-pass RAG | LangGraph ReAct agent loop |
+| Canvas manipulation | ❌ None | ✅ Full CRUD via tool calls |
+| Conversation memory | ❌ Stateless | ✅ Per-session MemorySaver |
+| Embeddings | MD5 hash (fake) | `BAAI/bge-small-en` (real semantic) |
+| Tools | None | `update_workflow_canvas`, `search_nexagent_docs`, `get_node_schema` |
+| LangChain | ❌ | ✅ LangChain 0.3 |
+| LangGraph | ❌ | ✅ LangGraph 0.2 (create_react_agent) |
 
 ---
 
 ## Architecture Overview
 
 ```
-User Question
-    ↓
-[Embedding] → Convert question to vector
-    ↓
-[Pinecone] → Search for similar document chunks
-    ↓
-[Retrieved Context] → Get relevant text from PDF
-    ↓
-[Groq LLM] → Generate answer using context
-    ↓
-Response to User
+User Message + Canvas State
+        ↓
+  ┌─────────────────────────────────────────────────────┐
+  │           LangGraph ReAct Agent Loop                │
+  │                                                     │
+  │  System Prompt (node catalog + rules embedded)      │
+  │        ↓                                            │
+  │  [LLM: llama-3.3-70b-versatile via Groq]           │
+  │        ↓                                            │
+  │  Decides which tool(s) to call:                     │
+  │    ├─ update_workflow_canvas(nodes, connections)    │
+  │    ├─ search_nexagent_docs(query) → Pinecone RAG   │
+  │    └─ get_node_schema(node_type) → inline lookup   │
+  │        ↓                                            │
+  │  Tool result fed back into agent loop               │
+  │        ↓                                            │
+  │  Final AIMessage (no tool calls) = answer           │
+  └─────────────────────────────────────────────────────┘
+        ↓                    ↓
+   Text answer         workflow_action
+   (Markdown)          UPDATE_CANVAS payload
+        ↓                    ↓
+   Chat bubble         Frontend replaces canvas
 ```
 
 ---
 
-## Components Used
+## Components
 
-### 1. **FastAPI** (Backend Framework)
-- Lightweight Python web framework
-- Handles HTTP requests/responses
-- Provides automatic API documentation
-- Used for creating `/query`, `/ingest`, and `/health` endpoints
+### 1. LangGraph `create_react_agent`
+- Standard ReAct loop: Reason → Act (call tool) → Observe → Repeat
+- Terminates when the LLM produces a message with no more tool calls
+- `MemorySaver` checkpointer stores message history keyed by `thread_id` (= `session_id`)
+- The system prompt (containing the full node catalog + rules) is injected every turn
 
-### 2. **Pinecone** (Vector Database)
-- Stores document embeddings (numerical representations of text)
-- Enables semantic search (finding similar content)
-- When you ask a question, it finds the most relevant document chunks
-- Your index has 384 dimensions (vector size)
+### 2. LangChain Tools
 
-### 3. **Groq** (LLM Provider)
-- Fast inference engine for language models
-- Uses `llama-3.3-70b-versatile` model
-- Generates human-like answers based on context
-- Much faster than traditional LLMs
+#### `update_workflow_canvas`
+Called when the user wants to build or modify a workflow.
+- Input: `nodes: List[dict]`, `connections: List[dict]`
+- Validates that the first node is a trigger
+- Returns a success JSON — the real payload is extracted from the tool *call arguments* (not the return value) by `_extract_workflow_action()`
 
-### 4. **PyPDF** (PDF Processing)
-- Extracts text from PDF files
-- Splits documents into pages
-- Preserves metadata (page numbers, source)
+#### `search_nexagent_docs`
+Called for factual questions about NexAgent.
+- Uses `PineconeVectorStore.similarity_search()` with `BAAI/bge-small-en` embeddings
+- Returns top-4 passage chunks with source metadata
+- Source names are extracted for the `sources[]` response field
+
+#### `get_node_schema`
+Called when the agent needs exact parameter names before generating JSON.
+- In-memory inline schema dict for all 21 node types
+- Returns schema + required/optional flags for the requested type
+
+### 3. HuggingFace Embeddings (`BAAI/bge-small-en`)
+- 384-dimensional sentence embeddings
+- Replaces the old MD5 hash approach
+- `normalize_embeddings=True` for cosine similarity in Pinecone
+- Pre-downloaded at build time (`build.sh`) so cold starts are fast
+
+### 4. Pinecone Vector Store
+- `langchain_pinecone.PineconeVectorStore` wraps the Pinecone SDK
+- Index auto-created if missing (384 dims, cosine metric, AWS us-east-1)
+- `/ingest` endpoint chunks `.pdf` and `.txt` files at 800 chars and upserts with page/source metadata
+
+### 5. Per-session Conversation Memory
+- `langgraph.checkpoint.memory.MemorySaver` stores full message history in-process
+- Each request passes `config={"configurable": {"thread_id": session_id}}`
+- `DELETE /reset-session/{id}` clears the checkpoint for a fresh start
 
 ---
 
-## How It Works Step-by-Step
+## Request → Response Flow
 
-### Step 1: Ingestion (`/ingest` endpoint)
-
-```python
-# Load PDF
-reader = PdfReader("data/domestic_care_services.pdf")
-
-# Extract text from each page
-for page in reader.pages:
-    text = page.extract_text()
-    # Store: {"text": "...", "page": 1, "source": "..."}
 ```
-
-**What happens:**
-- Reads your PDF file
-- Extracts text from each page
-- Creates embeddings (vector representations) using a hash function
-- Stores vectors in Pinecone with metadata
-
-**Why:** This prepares your knowledge base for searching.
-
----
-
-### Step 2: Query Processing (`/query` endpoint)
-
-```python
-# User asks: "What is DCS?"
-
-# Step 1: Convert question to embedding
-question_embedding = get_simple_embedding("What is DCS?")
-
-# Step 2: Search Pinecone for similar vectors
-results = index.query(
-    vector=question_embedding,
-    top_k=5  # Get top 5 most similar chunks
-)
-
-# Step 3: Extract context from results
-context = "DCS is a platform that connects clients..."
-
-# Step 4: Send to Groq with context
-message = groq_client.chat.completions.create(
-    model="llama-3.3-70b-versatile",
-    messages=[{
-        "role": "user",
-        "content": f"Context: {context}\n\nQuestion: What is DCS?"
-    }]
-)
-
-# Step 5: Return answer
-return {
-    "question": "What is DCS?",
-    "answer": "Based on the context, DCS stands for...",
-    "sources": ["domestic_care_services.pdf"]
-}
+POST /query
+  body: { question, session_id, current_state }
+    ↓
+1. Append current_state JSON to the user message text
+2. Wrap in HumanMessage
+3. agent.invoke(messages, config={thread_id: session_id})
+   → LangGraph runs ReAct loop with MemorySaver
+4. Scan result['messages'] for:
+   - Last AIMessage without tool_calls → answer text
+   - Any AIMessage.tool_calls targeting update_workflow_canvas → workflow_action
+   - ToolMessages from search_nexagent_docs → sources
+5. Return QueryResponse
 ```
-
-**What happens:**
-1. Your question is converted to a vector (384 dimensions)
-2. Pinecone finds the 5 most similar document chunks
-3. Those chunks become "context"
-4. Groq reads the context + your question
-5. Groq generates an answer based on the context
-6. Response is sent back with sources
-
-**Why:** This ensures answers are based on your actual documents, not the AI's general knowledge.
-
----
-
-## Key Concepts Explained
-
-### Embeddings
-- Convert text into numbers (vectors)
-- Similar text = similar vectors
-- Used for semantic search (finding meaning, not just keywords)
-- Example: "What is DCS?" and "Tell me about DCS" have similar embeddings
-
-### Vector Database (Pinecone)
-- Stores millions of vectors efficiently
-- Finds similar vectors in milliseconds
-- Like a smart search engine for meaning, not just text
-
-### Context Window
-- The text you send to the LLM
-- Format: `"Context: [relevant docs]\n\nQuestion: [user question]"`
-- Groq uses this context to generate accurate answers
-
-### Semantic Search vs Keyword Search
-- **Keyword**: Searches for exact words (old way)
-- **Semantic**: Understands meaning (new way)
-- Example: Searching "DCS" finds "Domestic Care Services" even if you don't use the acronym
 
 ---
 
 ## File Structure
 
 ```
-project/
-├── main.py                 # FastAPI app with all endpoints
-├── requirements.txt        # Python dependencies
-├── .env                    # API keys (never commit this)
-├── .gitignore             # Ignore venv, __pycache__, .env
-├── runtime.txt            # Python version for Render
+nexagent-chatbot/
+├── main.py                  # FastAPI app + LangGraph agent + tools
+├── requirements.txt         # All Python dependencies
+├── build.sh                 # Render build script (pre-caches embedding model)
+├── runtime.txt              # Python 3.11
+├── .env                     # API keys (never commit)
 ├── data/
-│   └── domestic_care_services.pdf  # Your knowledge base
-├── API_DOCUMENTATION.md   # How to use the API
-└── TECHNICAL_EXPLANATION.md  # This file
+│   ├── questions.txt        # NexAgent FAQ knowledge base
+│   └── *.pdf                # Any additional PDF docs to ingest
+├── index.html               # Test chat UI (handles workflow_action cards)
+├── API_DOCUMENTATION.md     # Full API reference
+└── TECHNICAL_EXPLANATION.md # This file
 ```
 
 ---
 
-## The Code Breakdown
+## The Three Embedding Approaches (Why We Upgraded)
 
-### Embedding Function
-```python
-def get_simple_embedding(text: str):
-    # Hash the text to create a consistent vector
-    hash_obj = hashlib.md5(text.encode())
-    hash_hex = hash_obj.hexdigest()
-    
-    # Convert hex to floats (0-1 range)
-    embedding = [float(int(hash_hex[i:i+2], 16)) / 255.0 
-                 for i in range(0, len(hash_hex), 2)]
-    
-    # Pad to 384 dimensions (Pinecone requirement)
-    while len(embedding) < 384:
-        embedding.extend(embedding[:384-len(embedding)])
-    
-    return embedding[:384]
-```
+| Approach | How | Quality | Speed | Production? |
+|----------|-----|---------|-------|-------------|
+| MD5 hash (v1) | Hash text → 384 floats | None (random-like) | Instant | ❌ |
+| BAAI/bge-small-en (v2) | Transformer sentence encoder | High semantic | ~50ms | ✅ |
+| OpenAI text-embedding | API call | Highest | ~200ms + cost | ✅ (paid) |
 
-**Why this approach:**
-- Deterministic (same text = same embedding always)
-- Fast (no external API calls)
-- Works for demo/MVP
-- Production would use proper embedding models like OpenAI or HuggingFace
+`BAAI/bge-small-en` is the right balance — fast, free, high quality, runs on CPU.
+
+---
+
+## Environment Variables
+
+| Variable | Purpose |
+|---|---|
+| `GROQ_API_KEY` | Groq API key for LLM inference |
+| `PINECONE_API_KEY` | Pinecone API key |
+| `PINECONE_INDEX_NAME` | Name of the Pinecone index (default: `nexagent-chatbot`) |
+| `embedding_model_name` | HuggingFace model ID (default: `BAAI/bge-small-en`) |
+| `LLM_MODEL_NAME` | Groq model name (default: `llama-3.3-70b-versatile`) |
 
 ---
 
 ## Deployment on Render
 
-### What Happens:
-1. **Git Push** → Code goes to GitHub
-2. **Render Detects** → Sees `requirements.txt` and `runtime.txt`
-3. **Build** → Installs Python 3.11 and all dependencies
-4. **Start** → Runs `uvicorn main:app --host 0.0.0.0 --port 8000`
-5. **Live** → Your API is accessible at the Render URL
+1. Push code to GitHub
+2. Render detects `requirements.txt` + `runtime.txt`
+3. `build.sh` runs: installs deps + pre-caches embedding model
+4. Server starts: `uvicorn main:app --host 0.0.0.0 --port 8000`
+5. Call `POST /ingest` once to populate Pinecone with your docs
 
-### Environment Variables:
-- `GROQ_API_KEY` - For Groq API calls
-- `PINECONE_API_KEY` - For Pinecone access
-- `PINECONE_INDEX_NAME` - Which Pinecone index to use
+> **Note:** `sentence-transformers` pulls PyTorch (~1 GB). Use Render's **Standard** plan or higher for the build step.
 
 ---
 
-## Flow Diagram
+## Key Design Decisions
 
-```
-┌─────────────────────────────────────────────────────────┐
-│                    React Native App                      │
-│                  (Your Expo Project)                     │
-└────────────────────┬────────────────────────────────────┘
-                     │
-                     │ POST /query
-                     │ {"question": "..."}
-                     ↓
-┌─────────────────────────────────────────────────────────┐
-│              FastAPI Server (Render)                     │
-│  ┌──────────────────────────────────────────────────┐   │
-│  │ 1. Convert question to embedding (384 dims)     │   │
-│  │ 2. Query Pinecone for similar vectors           │   │
-│  │ 3. Extract top 5 matching document chunks       │   │
-│  │ 4. Send context + question to Groq              │   │
-│  │ 5. Get AI-generated answer                      │   │
-│  │ 6. Return answer + sources                      │   │
-│  └──────────────────────────────────────────────────┘   │
-└────────────────────┬────────────────────────────────────┘
-                     │
-                     │ Response JSON
-                     │ {"answer": "...", "sources": [...]}
-                     ↓
-┌─────────────────────────────────────────────────────────┐
-│              React Native App                            │
-│         Display answer to user                          │
-└─────────────────────────────────────────────────────────┘
-```
-
----
-
-## Why This Approach is Good
-
-✅ **Accurate** - Answers based on your documents, not hallucinations  
-✅ **Fast** - Groq is 10x faster than traditional LLMs  
-✅ **Scalable** - Pinecone handles millions of vectors  
-✅ **Cost-Effective** - Only pay for what you use  
-✅ **Easy to Deploy** - Works on Render with minimal config  
-✅ **Maintainable** - Simple code, easy to understand  
-
----
-
-## What You Learned
-
-1. **RAG Architecture** - How to build intelligent search + generation
-2. **Vector Databases** - Semantic search using embeddings
-3. **API Design** - Building REST endpoints with FastAPI
-4. **Deployment** - Getting code live on Render
-5. **Integration** - Connecting frontend (Expo) to backend
-
----
-
-## Next Steps (Optional Improvements)
-
-- Use proper embedding models (HuggingFace, OpenAI)
-- Add authentication to API endpoints
-- Implement caching for faster responses
-- Add conversation history (multi-turn chat)
-- Use streaming responses for real-time answers
-- Add rate limiting to prevent abuse
-- Monitor API performance with logging
-
----
-
-## Resources
-
-- [FastAPI Docs](https://fastapi.tiangolo.com/)
-- [Pinecone Docs](https://docs.pinecone.io/)
-- [Groq API Docs](https://console.groq.com/docs/api-overview)
-- [RAG Explained](https://www.promptingguide.ai/techniques/rag)
-
----
-
-**You built a production-ready RAG chatbot. Great job!** 🚀
+- **Why LangGraph over plain LangChain?** LangGraph's stateful graph gives us automatic retry loops, clean tool-call handling, and built-in memory checkpointing without manual state management.
+- **Why inject `current_state` in the message?** The canvas changes every turn (the user might add nodes manually). Injecting it fresh each turn is more reliable than trusting stale history alone.
+- **Why extract `workflow_action` from tool_calls (not tool return)?** The LLM's tool_call arguments contain the exact nodes/connections it decided on — this is the ground truth, not the validation return value.
+- **Why `BAAI/bge-small-en`?** 384 dims matches the existing Pinecone index, runs fast on CPU, and gives real semantic search (unlike the old hash approach).
