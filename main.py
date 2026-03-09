@@ -4,7 +4,7 @@ NexAgent Agentic Chatbot Backend
 Architecture:
   - LangGraph ReAct Agent  (orchestration + agentic loops)
   - LangChain Tools        (canvas update, doc search, node schema lookup)
-  - Groq LLM               (llama-3.3-70b-versatile)
+  - Groq LLM               (openai/gpt-oss-20b)
   - Pinecone + HuggingFace (semantic RAG over NexAgent docs)
   - MemorySaver            (per-session conversation memory)
 
@@ -126,10 +126,13 @@ NODE_CATALOG = """
 SYSTEM_PROMPT = f"""You are **NexAgent Workflow Assistant** — a fully agentic AI that helps users \
 build, edit, and understand automation workflows on the NexAgent platform.
 
-You have three tools available:
-1. `update_workflow_canvas`  — build or modify the NexAgent visual canvas
-2. `search_nexagent_docs`    — search the NexAgent knowledge base
-3. `get_node_schema`         — get exact parameter details for any node type
+You have several tools available to incrementally modify the canvas:
+1. `add_node`          — Add a single new node to the canvas
+2. `update_node`       — Update an existing node's configuration
+3. `delete_node`       — Remove a node from the canvas
+4. `add_connection`    — Add a connection between two nodes
+5. `search_nexagent_docs` — search the NexAgent knowledge base
+6. `get_node_schema`   — get exact parameter details for any node type
 
 ---
 {NODE_CATALOG}
@@ -140,19 +143,27 @@ You have three tools available:
 1. Node IDs must be unique in the workflow (`n1`, `n2`, `n3`, …).
 2. The **first node MUST be a trigger** (ManualTrigger | Schedule | Webhook | ChatInput).
 3. All `type` strings are **case-sensitive** — match the catalog exactly.
-4. ADD request  → keep ALL existing nodes, append new ones.
-5. REMOVE request → drop only that node and its connections; rebuild IDs if needed.
-6. EDIT / CHANGE request → update ONLY the requested field(s) in the config; leave everything else intact.
-7. REPLACE request → generate a completely fresh canvas.
-8. IfCondition outgoing connections MUST use `"condition": "true"` and `"condition": "false"`.
-9. If an API key is needed but not provided, use a placeholder (e.g. `"YOUR_GROQ_API_KEY"`) and tell the user.
-10. After calling `update_workflow_canvas`, write a brief human-readable summary.
+4. ADD request  → call `add_node`.
+5. REMOVE request → call `delete_node`.
+6. EDIT / CHANGE request → call `update_node` with the updated fields.
+7. IfCondition outgoing connections MUST use `"condition": "true"` and `"condition": "false"`.
+8. If an API key is needed but not provided, use a placeholder (e.g. `"YOUR_GROQ_API_KEY"`) and tell the user.
+9. After making your tool calls, write a brief human-readable summary.
 
 ## Decision guide
-- User wants to BUILD / ADD / MODIFY / DELETE workflow → call `update_workflow_canvas`
+- User wants to BUILD / ADD a node → call `add_node`
+- User wants to MODIFY a node → call `update_node`
+- User wants to DELETE a node → call `delete_node`
+- User wants to CONNECT nodes → call `add_connection`
 - User asks a factual question → call `search_nexagent_docs` if unsure, else answer directly
 - Need exact param names for a node → call `get_node_schema` first
 - Ambiguous → ask one clarifying question, then proceed
+
+## ONE NODE PER TURN  (MANDATORY)
+- When building a multi-node workflow, add **exactly ONE node** (and its connection to the previous node) per response.
+- After calling `add_node` once, write ONE short sentence like: "Added [NodeType]. Ready to add [NextNodeType] — say **continue** or describe any changes."
+- Then STOP. Do not call `add_node` again in the same turn.
+- Exception: a single `add_connection` call may accompany the node in the same turn.
 """
 
 # ── Pydantic Models ────────────────────────────────────────────────────────────
@@ -165,19 +176,15 @@ class QueryRequest(BaseModel):
     current_state: Optional[CanvasState] = None
     session_id: Optional[str] = "default"
 
-class WorkflowPayload(BaseModel):
-    nodes: List[Dict[str, Any]]
-    connections: List[Dict[str, Any]]
-
 class WorkflowAction(BaseModel):
-    type: str = "UPDATE_CANVAS"
-    payload: WorkflowPayload
+    type: str
+    payload: Dict[str, Any]
 
 class QueryResponse(BaseModel):
     question: str
     answer: str
     sources: List[str] = Field(default_factory=list)
-    workflow_action: Optional[WorkflowAction] = None
+    workflow_actions: List[WorkflowAction] = Field(default_factory=list)
 
 # ── Client Initialisation ──────────────────────────────────────────────────────
 logger.info("Loading HuggingFace embedding model: %s", EMBEDDING_MODEL)
@@ -206,7 +213,7 @@ vector_store = PineconeVectorStore(
 )
 
 logger.info("Initialising Groq LLM: %s", LLM_MODEL)
-llm = ChatGroq(api_key=GROQ_API_KEY, model=LLM_MODEL, temperature=0.3)
+llm = ChatGroq(api_key=GROQ_API_KEY, model=LLM_MODEL, temperature=0.3, max_tokens=800)
 
 # In-memory checkpointer — persists per-session conversation history at runtime
 memory = MemorySaver()
@@ -214,51 +221,54 @@ memory = MemorySaver()
 # ── LangChain Tools ────────────────────────────────────────────────────────────
 
 @tool
-def update_workflow_canvas(
-    nodes: List[Dict[str, Any]],
-    connections: List[Dict[str, Any]],
-) -> str:
+def add_node(node: Dict[str, Any], connections: Optional[List[Dict[str, Any]]] = None) -> str:
     """
-    Update the NexAgent visual canvas with a new or modified workflow.
-
-    Call this whenever the user wants to:
-    - Build a brand-new workflow from scratch
-    - Add one or more nodes to the existing canvas
-    - Remove a node from the canvas
-    - Change any config value / variable inside a node
-    - Replace the entire workflow
-
+    Add a single new node to the canvas, optionally with connections.
+    
     Args:
-        nodes: Complete list of ALL nodes for the final canvas.
-               Each item: {"id": "n1", "type": "NodeType", "name": "...", "config": {...}}
-        connections: Complete list of ALL connections for the final canvas.
+        node: The node data {"id": "n1", "type": "NodeType", "name": "...", "config": {...}}
+        connections: Optional list of connections to add along with this node.
                Each item: {"from": "n1", "to": "n2", "condition": null | "true" | "false"}
-
-    Returns:
-        JSON string confirming the update.
     """
-    if not nodes:
-        return json.dumps({"status": "error", "message": "nodes list cannot be empty"})
-
     trigger_types = {"ManualTrigger", "Schedule", "Webhook", "ChatInput"}
-    first_type = nodes[0].get("type", "")
-    if first_type not in trigger_types:
-        return json.dumps({
-            "status": "warning",
-            "message": (
-                f"First node type '{first_type}' is not a recognised trigger. "
-                "Consider using ManualTrigger, Schedule, Webhook, or ChatInput."
-            ),
-            "nodes_count": len(nodes),
-            "connections_count": len(connections),
-        })
+    node_type = node.get("type", "")
+    conns = connections or []
+    if node_type in trigger_types:
+        return json.dumps({"status": "success", "action": "ADD_NODE", "node": node, "connections": conns, "message": f"Added trigger {node_type}"})
+    return json.dumps({"status": "success", "action": "ADD_NODE", "node": node, "connections": conns})
 
-    return json.dumps({
-        "status": "success",
-        "nodes_count": len(nodes),
-        "connections_count": len(connections),
-        "message": f"Canvas updated — {len(nodes)} node(s), {len(connections)} connection(s).",
-    })
+@tool
+def update_node(node_id: str, new_config: Dict[str, Any]) -> str:
+    """
+    Update an existing node's config.
+    
+    Args:
+        node_id: The ID of the node to update.
+        new_config: The entirely new configuration dictionary for this node.
+    """
+    return json.dumps({"status": "success", "action": "UPDATE_NODE", "node_id": node_id, "config": new_config})
+
+@tool
+def delete_node(node_id: str) -> str:
+    """
+    Remove a node from the canvas. (Connections associated with it will ordinarily be cleaned up by the frontend).
+    
+    Args:
+        node_id: The ID of the node to delete.
+    """
+    return json.dumps({"status": "success", "action": "DELETE_NODE", "node_id": node_id})
+
+@tool
+def add_connection(source_node_id: str, target_node_id: str, condition: Optional[str] = None) -> str:
+    """
+    Add a connection between two existing nodes.
+    
+    Args:
+        source_node_id: The ID of the source node.
+        target_node_id: The ID of the target node.
+        condition: Optional condition ('true', 'false', or null). Required for IfCondition sources.
+    """
+    return json.dumps({"status": "success", "action": "ADD_CONNECTION", "source": source_node_id, "target": target_node_id, "condition": condition})
 
 
 @tool
@@ -347,7 +357,7 @@ def get_node_schema(node_type: str) -> str:
 
 
 # ── Agent Setup ────────────────────────────────────────────────────────────────
-TOOLS = [update_workflow_canvas, search_nexagent_docs, get_node_schema]
+TOOLS = [add_node, update_node, delete_node, add_connection, search_nexagent_docs, get_node_schema]
 
 agent = create_react_agent(
     model=llm,
@@ -357,30 +367,44 @@ agent = create_react_agent(
 )
 
 
-def _extract_workflow_action(messages: list) -> Optional[Dict[str, Any]]:
+def _extract_workflow_actions(messages: list) -> List[Dict[str, Any]]:
     """
-    Scan agent output messages for the latest update_workflow_canvas tool call.
-    Returns the payload dict or None.
+    Scan agent output messages for workflow tool calls from the CURRENT turn only.
+    Finds the last HumanMessage (start of this turn) and collects ALL canvas tool
+    calls after it in execution order — so multi-step workflows are fully captured.
     """
-    for msg in reversed(messages):
+    # Locate the start of the current turn
+    last_human_idx = -1
+    for i, msg in enumerate(messages):
+        if isinstance(msg, HumanMessage):
+            last_human_idx = i
+
+    actions = []
+    for msg in messages[last_human_idx + 1:]:
         if isinstance(msg, AIMessage) and msg.tool_calls:
             for tc in msg.tool_calls:
-                if tc["name"] == "update_workflow_canvas":
-                    args = tc["args"]
-                    return {
-                        "type": "UPDATE_CANVAS",
-                        "payload": {
-                            "nodes": args.get("nodes", []),
-                            "connections": args.get("connections", []),
-                        },
-                    }
-    return None
+                name = tc["name"]
+                args = tc["args"]
+                if name == "add_node":
+                    actions.append({"type": "ADD_NODE", "payload": args})
+                elif name == "update_node":
+                    actions.append({"type": "UPDATE_NODE", "payload": args})
+                elif name == "delete_node":
+                    actions.append({"type": "DELETE_NODE", "payload": args})
+                elif name == "add_connection":
+                    actions.append({"type": "ADD_CONNECTION", "payload": args})
+    return actions
 
 
 def _extract_sources(messages: list) -> List[str]:
-    """Extract document source names from search_nexagent_docs tool messages."""
+    """Extract document source names from search_nexagent_docs tool messages (current turn only)."""
+    last_human_idx = -1
+    for i, msg in enumerate(messages):
+        if isinstance(msg, HumanMessage):
+            last_human_idx = i
+
     sources: List[str] = []
-    for msg in messages:
+    for msg in messages[last_human_idx + 1:]:
         if getattr(msg, "name", None) == "search_nexagent_docs":
             content = getattr(msg, "content", "")
             for line in content.split("\n"):
@@ -429,10 +453,22 @@ def query_chatbot(request: QueryRequest):
     # what is on the canvas — without relying on stale history alone.
     canvas_section = ""
     if request.current_state:
-        canvas_json = request.current_state.model_dump()
+        # Create a lightweight summary instead of full JSON to save tokens
+        canvas_summary = {
+            "nodes": [
+                {
+                    "id": n.get("id"),
+                    "type": n.get("type"),
+                    "name": n.get("name"),
+                    "config": n.get("config", {})
+                }
+                for n in request.current_state.nodes
+            ],
+            "connections": request.current_state.connections
+        }
         canvas_section = (
-            f"\n\n[CURRENT CANVAS STATE]\n```json\n{json.dumps(canvas_json, indent=2)}\n```\n"
-            "When modifying, KEEP all existing nodes/connections unless user explicitly asks to remove or replace them."
+            f"\n\n[CURRENT CANVAS STATE SUMMARY]\n```json\n{json.dumps(canvas_summary, indent=2)}\n```\n"
+            "Use your node tools (add_node, update_node, delete_node) to modify this incrementally."
         )
 
     user_message = f"{request.question}{canvas_section}"
@@ -460,21 +496,18 @@ def query_chatbot(request: QueryRequest):
     if not answer:
         answer = "I've processed your request. Please check the canvas for updates."
 
-    workflow_action_dict = _extract_workflow_action(messages)
+    actions_dicts = _extract_workflow_actions(messages)
     sources = _extract_sources(messages)
 
-    workflow_action_obj: Optional[WorkflowAction] = None
-    if workflow_action_dict:
-        workflow_action_obj = WorkflowAction(
-            type=workflow_action_dict["type"],
-            payload=WorkflowPayload(**workflow_action_dict["payload"]),
-        )
+    workflow_actions = []
+    for ad in actions_dicts:
+        workflow_actions.append(WorkflowAction(type=ad["type"], payload=ad["payload"]))
 
     return QueryResponse(
         question=request.question,
         answer=answer,
         sources=sources,
-        workflow_action=workflow_action_obj,
+        workflow_actions=workflow_actions,
     )
 
 

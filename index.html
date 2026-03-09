@@ -229,7 +229,7 @@ html,body{height:100%;overflow:hidden;font-family:'Inter',sans-serif;background:
     <div id="chat-header">
       <div class="title">
         <h1>NexAgent Workflow Assistant</h1>
-        <p>LangGraph Agent Â· Groq Â· Pinecone Â· localhost:8000</p>
+        <p>LangGraph Agent · Groq · Pinecone · localhost:8000</p>
       </div>
       <div id="server-status"><div id="status-dot"></div><span id="status-text">Checkingâ€¦</span></div>
       <button class="header-btn" id="ingest-btn" title="Ingest documents in data/">â¬† Ingest Docs</button>
@@ -306,7 +306,7 @@ html,body{height:100%;overflow:hidden;font-family:'Inter',sans-serif;background:
 <script>
 marked.setOptions({ breaks: true });
 
-const API = 'http://127.0.0.1:8000';
+const API = 'http://localhost:8000';
 
 // â”€â”€ Session â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 let sessionId = sessionStorage.getItem('nxa_sid') || 'session_' + Math.random().toString(36).slice(2,10);
@@ -421,7 +421,7 @@ input.addEventListener('keydown', e => {
 sendBtn.addEventListener('click', sendMessage);
 
 // â”€â”€ Add message to chat â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-function addMsg(text, role, sources=[], workflowAction=null) {
+function addMsg(text, role, sources=[], workflowActions=[]) {
   const div = document.createElement('div');
   div.className = `msg ${role}`;
   div.innerHTML = role === 'bot' ? marked.parse(text) : escapeHtml(text);
@@ -440,8 +440,35 @@ function addMsg(text, role, sources=[], workflowAction=null) {
 
   msgs.insertBefore(div, typing);
 
-  if (workflowAction?.type === 'UPDATE_CANVAS') {
-    canvas = workflowAction.payload;
+  if (workflowActions && workflowActions.length > 0) {
+    workflowActions.forEach(action => {
+      switch (action.type) {
+        case 'ADD_NODE':
+          canvas.nodes.push(action.payload.node);
+          if (action.payload.connections) {
+            canvas.connections.push(...action.payload.connections);
+          }
+          break;
+        case 'UPDATE_NODE':
+          const idx = canvas.nodes.findIndex(n => n.id === action.payload.node_id);
+          if (idx !== -1) {
+            canvas.nodes[idx].config = action.payload.config;
+          }
+          break;
+        case 'DELETE_NODE':
+          canvas.nodes = canvas.nodes.filter(n => n.id !== action.payload.node_id);
+          canvas.connections = canvas.connections.filter(c => c.from !== action.payload.node_id && c.to !== action.payload.node_id);
+          break;
+        case 'ADD_CONNECTION':
+          canvas.connections.push({
+            from: action.payload.source,
+            to: action.payload.target,
+            condition: action.payload.condition
+          });
+          break;
+      }
+    });
+    
     renderCanvas();
 
     const card = document.createElement('div');
@@ -449,14 +476,14 @@ function addMsg(text, role, sources=[], workflowAction=null) {
     card.innerHTML = `
       <div class="canvas-card-header">
         <svg viewBox="0 0 24 24"><path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/></svg>
-        Canvas Updated
+        Canvas Updated (${workflowActions.length} patch(es))
       </div>
       <div class="badges">
-        <span class="badge">ðŸŸ¦ ${canvas.nodes.length} node${canvas.nodes.length!==1?'s':''}</span>
-        <span class="badge">ðŸ”— ${canvas.connections.length} connection${canvas.connections.length!==1?'s':''}</span>
+        <span class="badge">🔹 ${canvas.nodes.length} node${canvas.nodes.length!==1?'s':''}</span>
+        <span class="badge">🔗 ${canvas.connections.length} connection${canvas.connections.length!==1?'s':''}</span>
       </div>
       <details>
-        <summary>View workflow JSON â–¾</summary>
+        <summary>View workflow JSON ▾</summary>
         <pre>${escapeHtml(JSON.stringify(canvas,null,2))}</pre>
       </details>`;
     msgs.insertBefore(card, typing);
@@ -502,7 +529,7 @@ async function sendMessage() {
     }
 
     const data = await r.json();
-    addMsg(data.answer, 'bot', data.sources || [], data.workflow_action || null);
+    addMsg(data.answer, 'bot', data.sources || [], data.workflow_actions || []);
 
   } catch(e) {
     typing.style.display = 'none';
